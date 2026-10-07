@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Big Data Pipeline & Analytics Dashboard</title>
+  <!-- Google Fonts & Chart.js -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="logo-container">
+      <div class="logo-icon">📊</div>
+      <div>
+        <h1 class="brand-title">BigData Stock Analytics Platform</h1>
+        <p class="brand-subtitle">Hadoop Cluster & PySpark Distributed Engine • Tableau Analytics</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="badge badge-bullish" id="pipeline-status-badge">
+        <i data-lucide="check-circle" style="width:14px; height:14px; margin-right:4px;"></i> Cluster Active (20,220 Records)
+      </span>
+      <a href="/api/export/tableau-csv" class="btn btn-primary" download>
+        <i data-lucide="download" style="width:16px; height:16px;"></i> Export Tableau CSV
+      </a>
+      <button class="btn btn-outline" onclick="triggerPipelineRun()">
+        <i data-lucide="refresh-cw" id="refresh-icon" style="width:16px; height:16px;"></i> Re-run Pipeline
+      </button>
+    </div>
+  </header>
+
+  <!-- Control & Filter Bar -->
+  <div class="control-bar">
+    <div class="ticker-selector-group" id="ticker-buttons-container">
+      <!-- Injected by JavaScript -->
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <div class="timeframe-group">
+        <button class="tf-btn" onclick="setTimeframe('1M')">1M</button>
+        <button class="tf-btn" onclick="setTimeframe('6M')">6M</button>
+        <button class="tf-btn" onclick="setTimeframe('1Y')">1Y</button>
+        <button class="tf-btn" onclick="setTimeframe('3Y')">3Y</button>
+        <button class="tf-btn" onclick="setTimeframe('5Y')">5Y</button>
+        <button class="tf-btn active" onclick="setTimeframe('ALL')">ALL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Dashboard Container -->
+  <main class="dashboard-container">
+
+    <!-- KPI Metrics Grid -->
+    <div class="kpi-grid">
+      <div class="kpi-card" id="kpi-card-price">
+        <div class="kpi-title">
+          <span>Latest Close Price</span>
+          <i data-lucide="dollar-sign" style="width:16px; height:16px;"></i>
+        </div>
+        <div class="kpi-value" id="kpi-price">$0.00</div>
+        <div class="kpi-subtitle" id="kpi-return-container">
+          <span class="badge" id="kpi-return">+0.00%</span>
+          <span style="color: var(--text-muted); font-size: 0.75rem;" id="kpi-date">Latest Date</span>
+        </div>
+      </div>
+
+      <div class="kpi-card bullish" id="kpi-card-trend">
+        <div class="kpi-title">
+          <span>Question 1: Trend Insight</span>
+          <i data-lucide="trending-up" style="width:16px; height:16px;"></i>
+        </div>
+        <div class="kpi-value" id="kpi-trend">Bullish</div>
+        <div class="kpi-subtitle">
+          <span class="badge badge-bullish" id="kpi-crossover">Golden Cross</span>
+          <span style="color: var(--text-secondary); font-size: 0.75rem;" id="kpi-sma50-diff">vs 50-SMA: +0.0%</span>
+        </div>
+      </div>
+
+      <div class="kpi-card amber" id="kpi-card-volatility">
+        <div class="kpi-title">
+          <span>Question 2: Volatility Risk</span>
+          <i data-lucide="activity" style="width:16px; height:16px;"></i>
+        </div>
+        <div class="kpi-value" id="kpi-volatility">0.0%</div>
+        <div class="kpi-subtitle">
+          <span class="badge" id="kpi-vol-badge">Moderate Volatility</span>
+          <span style="color: var(--text-secondary); font-size: 0.75rem;" id="kpi-vol-50d">50d: 0.0%</span>
+        </div>
+      </div>
+
+      <div class="kpi-card purple" id="kpi-card-compare">
+        <div class="kpi-title">
+          <span>Question 3: Peer Benchmark</span>
+          <i data-lucide="scale" style="width:16px; height:16px;"></i>
+        </div>
+        <div class="kpi-value" id="kpi-beta">β 1.00</div>
+        <div class="kpi-subtitle">
+          <span class="badge badge-neutral" id="kpi-sharpe">Sharpe: 0.00</span>
+          <span style="color: var(--text-secondary); font-size: 0.75rem;" id="kpi-total-return">Total: +0.0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Question 1 Section: Which Way Is This Stock Moving? -->
+    <section class="analytics-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <i data-lucide="compass" style="color: var(--accent-blue);"></i>
+            Question 1: "Which Way Is This Stock Moving?"
+          </h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;">
+            Parallel calculation of Daily Returns, 20-day, 50-day, and 200-day Moving Averages with Golden/Death Cross detection.
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <span class="section-tag">Trend & Moving Averages</span>
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-left: 10px;">
+            <input type="checkbox" id="toggle-sma50" checked onchange="updatePriceChart()"> 50-Day SMA
+          </label>
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
+            <input type="checkbox" id="toggle-sma200" checked onchange="updatePriceChart()"> 200-Day SMA
+          </label>
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
+            <input type="checkbox" id="toggle-sma20" onchange="updatePriceChart()"> 20-Day SMA
+          </label>
+        </div>
+      </div>
+
+      <div class="section-grid-2">
+        <div class="chart-wrapper-tall">
+          <canvas id="trendPriceChart"></canvas>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <div style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 10px; padding: 1.25rem;">
+            <h4 style="font-size: 0.9rem; margin-bottom: 0.75rem; color: #93C5FD; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="cpu" style="width: 16px; height: 16px;"></i> Trend Signal Summary
+            </h4>
+            <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 0.6rem;">
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">Current Regime:</span>
+                <strong id="trend-signal-label" style="color:var(--bullish);">Strong Bullish</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">50-Day Moving Avg:</span>
+                <span id="trend-sma50-val" style="font-family:var(--font-mono);">$0.00</span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">200-Day Moving Avg:</span>
+                <span id="trend-sma200-val" style="font-family:var(--font-mono);">$0.00</span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">Price vs 50-SMA:</span>
+                <span id="trend-sma50-spread" style="font-family:var(--font-mono); color:var(--bullish);">+0.00%</span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">50 vs 200 Crossover:</span>
+                <span id="trend-crossover-val" style="font-family:var(--font-mono);">Golden Cross</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 10px; padding: 1.25rem;">
+            <h4 style="font-size: 0.9rem; margin-bottom: 0.75rem; color: #A78BFA; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="bar-chart-2" style="width: 16px; height: 16px;"></i> Daily Returns Distribution
+            </h4>
+            <div class="chart-wrapper" style="height: 180px;">
+              <canvas id="returnsHistChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Question 2 Section: How Volatile Is It? -->
+    <section class="analytics-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <i data-lucide="zap" style="color: var(--accent-amber);"></i>
+            Question 2: "How Volatile Is It?"
+          </h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;">
+            Rolling Standard Deviation annualized across 252 trading days (σ × √252), Intraday Spreads & Maximum Drawdowns.
+          </p>
+        </div>
+        <span class="section-tag" style="background: rgba(245, 158, 11, 0.15); color: #FBBF24;">Volatility & Risk Lab</span>
+      </div>
+
+      <div class="section-grid-2">
+        <div class="chart-wrapper">
+          <canvas id="volatilityChart"></canvas>
+        </div>
+        <div style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 10px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <h4 style="font-size: 0.9rem; margin-bottom: 0.75rem; color: #FBBF24; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="shield-alert" style="width: 16px; height: 16px;"></i> Volatility & Risk Diagnostics
+            </h4>
+            <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 0.7rem;">
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">21-Day Annualized Vol:</span>
+                <strong id="vol-diag-21d" style="font-family:var(--font-mono); color:var(--text-primary);">0.0%</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">50-Day Annualized Vol:</span>
+                <strong id="vol-diag-50d" style="font-family:var(--font-mono); color:var(--text-primary);">0.0%</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">Overall Multi-Year Vol:</span>
+                <strong id="vol-diag-overall" style="font-family:var(--font-mono); color:var(--text-primary);">0.0%</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">Max Historical Drawdown:</span>
+                <strong id="vol-diag-maxdd" style="font-family:var(--font-mono); color:var(--bearish);">-0.0%</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-secondary);">Risk Classification:</span>
+                <span class="badge" id="vol-diag-class">Moderate Risk</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+            <div style="font-size: 0.75rem; color: var(--text-muted);">
+              <strong>PySpark Formula:</strong> <br>
+              <code>Annualized_Vol = stddev(Daily_Return).over(Window.rowsBetween(-49, 0)) * sqrt(252)</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Question 3 Section: How Does It Compare With Other Stocks? -->
+    <section class="analytics-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <i data-lucide="layers" style="color: var(--accent-purple);"></i>
+            Question 3: "How Does It Compare With Other Stocks?"
+          </h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;">
+            Normalized performance baseline ($100 invested), Risk-Return Efficient Frontier, Beta vs SPY Benchmark & Pearson Correlation.
+          </p>
+        </div>
+        <span class="section-tag" style="background: rgba(139, 92, 246, 0.15); color: #C4B5FD;">Cross-Stock Benchmarking</span>
+      </div>
+
+      <!-- Normalized Performance Comparison Chart -->
+      <div style="margin-bottom: 1.5rem;">
+        <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--text-primary);">
+          Multi-Stock Relative Growth Comparison (Indexed to $100)
+        </h3>
+        <div class="chart-wrapper-tall">
+          <canvas id="multiStockChart"></canvas>
+        </div>
+      </div>
+
+      <div class="section-grid-2">
+        <!-- Risk vs Return Scatter Plot -->
+        <div>
+          <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--text-primary);">
+            Risk vs. Return Efficient Frontier (Volatility vs Annualized Return)
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="riskReturnScatterChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Correlation Matrix Heatmap -->
+        <div>
+          <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--text-primary);">
+            Pearson Correlation Matrix
+          </h3>
+          <div style="overflow-x: auto; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.75rem;" id="correlation-heatmap-container">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Peer Comparison Data Table -->
+      <div style="margin-top: 1.5rem;">
+        <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--text-primary);">
+          Comprehensive Cross-Stock Metrics Comparison Table
+        </h3>
+        <div class="data-table-container">
+          <table class="custom-table" id="peer-comparison-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Latest Close</th>
+                <th>Daily Return</th>
+                <th>Annual Return</th>
+                <th>50-Day Volatility</th>
+                <th>Beta (vs SPY)</th>
+                <th>Sharpe Ratio</th>
+                <th>Max Drawdown</th>
+                <th>Trend Direction</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Injected by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tableau Dashboard Integration & Architecture Section -->
+    <section class="tableau-hero-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
+            <span class="tableau-badge">TABLEAU INTEGRATION</span>
+            <h2 style="font-size: 1.25rem; font-weight: 700;">Tableau Dashboard Connector & Big Data Architecture</h2>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); max-width: 850px;">
+            The big data pipeline extracts multi-year historical prices from Hadoop HDFS, computes metrics via PySpark / MapReduce in parallel, and delivers a clean, partitioned dataset directly into Tableau Desktop / Tableau Server for visual storytelling.
+          </p>
+        </div>
+        <div>
+          <a href="/api/export/tableau-csv" class="btn btn-primary" download>
+            <i data-lucide="file-spreadsheet" style="width: 16px; height: 16px;"></i> Download Tableau Dataset (.CSV)
+          </a>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 1rem;">
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+          <h4 style="font-size: 0.85rem; color: #93C5FD; margin-bottom: 0.5rem;">📁 1. Hadoop HDFS Cluster Storage</h4>
+          <p style="font-size: 0.8rem; color: var(--text-secondary);">
+            Raw historical stock OHLCV data stored across HDFS distributed blocks with 3x replication factor under <code>/user/hadoop/stock_analytics/raw</code>.
+          </p>
+        </div>
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+          <h4 style="font-size: 0.85rem; color: #34D399; margin-bottom: 0.5rem;">⚡ 2. PySpark Parallel Processing</h4>
+          <p style="font-size: 0.8rem; color: var(--text-secondary);">
+            PySpark Window functions partition by Ticker and calculate Daily Return, 50-day/200-day Moving Averages, and 50-day rolling Volatility in parallel.
+          </p>
+        </div>
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+          <h4 style="font-size: 0.85rem; color: #FBBF24; margin-bottom: 0.5rem;">📈 3. Tableau Dashboard Visualizations</h4>
+          <p style="font-size: 0.8rem; color: var(--text-secondary);">
+            Connect Tableau directly to <code>processed_stock_analytics.csv</code> to build interactive dual-axis trend lines, volatility heatmaps, and beta comparison scatter plots.
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="js/app.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
